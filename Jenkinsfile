@@ -60,6 +60,17 @@ pipeline {
                 }
             }
         }
+
+
+        stage('Upload to S3') {
+            steps {
+                withAWS(credentials: 'aws-credentials', region: 'ap-south-1') {
+                    s3Upload(bucket: 'springpetclinicbhavishartifact', 
+                             file: 'target/spring-petclinic-3.4.0-SNAPSHOT.jar', 
+                             path: 'artifacts/')
+                }
+            }
+        }
     }
 
     post {
