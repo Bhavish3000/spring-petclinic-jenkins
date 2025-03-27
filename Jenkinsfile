@@ -75,11 +75,11 @@ pipeline {
 
     post {
         success {
-            echo 'Build and artifact archiving completed successfully!'
+            echo 'Build, artifact archiving and Static code analysis completed successfully!'
         }
 
         failure {
-            echo 'Build or artifact archiving failed!'
+            echo 'Build or artifact archiving  or Static code analysis failed!'
         }
     }
 }
