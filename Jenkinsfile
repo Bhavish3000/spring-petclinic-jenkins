@@ -25,9 +25,9 @@ pipeline {
                 label 'terraform'
             }
             steps {
-                sh 'chmod +x ./terraform.sh'
+                sh 'chmod +x ./Terraform.sh'
 
-                sh './terraform.sh'
+                sh './Terraform.sh'
             }
         }
 
