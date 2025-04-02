@@ -16,6 +16,7 @@ pipeline {
         string(name: 'sonarInstallationName', defaultValue: 'SONAR_CLOUD', description: 'Installation Name of Sonar cloud in system configuration')
         string(name: 'aws_credentials', defaultValue: 'aws-credentials', description: 'Accesskey and secreatekey of AWs iam user')
         string(name: 'aws_region', defaultValue: 'ap-south-1', description: 'AWS global region')
+        string(name: 's3_bucket', defaultValue: 'springpetclinicbhavishartifact', description: 'Name of the AWS s3 bucket')
 
 
 
@@ -81,7 +82,7 @@ pipeline {
         stage('Upload to S3') {
             steps {
                 withAWS(credentials: params.aws_credentials, region: params.aws_region) {
-                    s3Upload(bucket: 'springpetclinicbhavishartifact', 
+                    s3Upload(bucket: params.s3_bucket, 
                              file: 'target/spring-petclinic-3.4.0-SNAPSHOT.jar', 
                              path: 'artifacts/')
                 }
