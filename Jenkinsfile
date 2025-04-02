@@ -17,6 +17,9 @@ pipeline {
         string(name: 'aws_credentials', defaultValue: 'aws-credentials', description: 'Accesskey and secreatekey of AWs iam user')
         string(name: 'aws_region', defaultValue: 'ap-south-1', description: 'AWS global region')
         string(name: 's3_bucket', defaultValue: 'springpetclinicbhavishartifact', description: 'Name of the AWS s3 bucket')
+        string(name: 'artifact_path', defaultValue: '**/target/*.jar', description: 'Artifact path of the pipeline')
+        string(name: 'unittest_path', defaultValue: '**/surefire-reports/*.xml', description: 'path for the Unit teats')
+        string(name: 'sonar_organization', defaultValue: 'gameoflifebhavish', description: 'Sonar cloud organization')
 
 
 
@@ -44,14 +47,14 @@ pipeline {
                     traceability: true
                 ) {
                     sh 'mvn clean install'
-                    junit testResults: '**/surefire-reports/*.xml'
+                    junit testResults: params.unittest_path
                 }
             }
         }
 
         stage('Archive Artifact') {
             steps {
-                archiveArtifacts artifacts: '**/target/*.jar',
+                archiveArtifacts artifacts: params.artifact_path,
                     fingerprint: true,
                     onlyIfSuccessful: true
             }
@@ -63,7 +66,7 @@ pipeline {
                     sh '''
                     mvn clean package \
                     org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar \
-                    -Dsonar.organization=gameoflifebhavish \
+                    -Dsonar.organization=${params.sonar_organization} \
                     -Dsonar.projectKey=1df882c96abe130b80ff99bc2fc7e4b745535a7f
                     '''
                 }
@@ -81,9 +84,9 @@ pipeline {
 
         stage('Upload to S3') {
             steps {
-                withAWS(credentials: params.aws_credentials, region: params.aws_region) {
+                withAWS(credentialsId: params.aws_credentials, region: params.aws_region) {
                     s3Upload(bucket: params.s3_bucket, 
-                             file: 'target/spring-petclinic-3.4.0-SNAPSHOT.jar', 
+                             file: params.artifact_path, 
                              path: 'artifacts/')
                 }
             }
