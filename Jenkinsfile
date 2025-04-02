@@ -1,8 +1,24 @@
 pipeline {
-    agent any
+    agent {
+        label params.agentlabel
+    }
 
     triggers {
         pollSCM('H/15 * * * *')
+    }
+
+    parameters {
+        string(name: 'agentlabel', defaultValue: 'Build', description: 'agent label')
+        string(name: 'giturl', defaultValue: 'https://github.com/Bhavish3000/spring-petclinic.git', description: 'github repository url')
+        string(name: 'gitbranch', defaultValue: 'main', description: "github repository branch")
+        string(name: 'GithubCredentialsID', defaultValue: 'GithubCredentials', description: 'Github account Credentials')
+        string(name: 'sonarcredentials', defaultValue: 'SONARCLOUD_TOKEN', description: 'Access token for the sonar cloud')
+        string(name: 'sonarInstallationName', defaultValue: 'SONAR_CLOUD', description: 'Installation Name of Sonar cloud in system configuration')
+        string(name: 'aws_credentials', defaultValue: 'aws-credentials', description: 'Accesskey and secreatekey of AWs iam user')
+        string(name: 'aws_region', defaultValue: 'ap-south-1', description: 'AWS global region')
+
+
+
     }
 
     tools {
@@ -13,9 +29,9 @@ pipeline {
     stages {
         stage('Checkout SCM') {
             steps {
-                git url: 'https://github.com/Bhavish3000/spring-petclinic.git',
-                    branch: 'main',
-                    credentialsId: 'GithubCredentials'
+                git url: params.giturl,
+                    branch: params.gitbranch,
+                    credentialsId: params.GithubCredentialsID
             }
         }
 
@@ -42,7 +58,7 @@ pipeline {
 
         stage('SonarCloud analysis') {
             steps {
-                withSonarQubeEnv(credentialsId: 'SONARCLOUD_TOKEN', installationName: 'SONAR_CLOUD') {
+                withSonarQubeEnv(credentialsId: params.sonarcredentials, installationName: params.sonarInstallationName) {
                     sh '''
                     mvn clean package \
                     org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar \
@@ -64,7 +80,7 @@ pipeline {
 
         stage('Upload to S3') {
             steps {
-                withAWS(credentials: 'aws-credentials', region: 'ap-south-1') {
+                withAWS(credentials: params.aws_credentials, region: params.aws_region) {
                     s3Upload(bucket: 'springpetclinicbhavishartifact', 
                              file: 'target/spring-petclinic-3.4.0-SNAPSHOT.jar', 
                              path: 'artifacts/')
