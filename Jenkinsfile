@@ -1,17 +1,18 @@
 pipeline {
-    agent none
+    agent {
+        label 'Kubernetes'
+    }
 
     triggers {
-        cron('0 18 * * 1-5')
+        cron('0 23 * * 1-5')
     }
 
     environment {
-        registry = 'bhavishtumalapenta/spring-petclinic-jenkins'
-        registryCredential = 'dockerhub'
-        dockerImage = ''
+        KUBECONFIG = credentials('kubernetes-config')
     }
 
     stages {
+
         stage('Checkout SCM') {
             steps {
                 git url: 'https://github.com/Bhavish3000/spring-petclinic.git',
@@ -19,65 +20,36 @@ pipeline {
                     credentialsId: 'GithubCredentials'
             }
         }
+        
 
-        stage('Infrastructure') {
-            agent {
-                label 'terraform'
-            }
-            steps {
-                sh 'chmod +x ./Terraform.sh'
-
-                sh './Terraform.sh'
-            }
-        }
-
-        stage('Build Docker Image') {
-            agent {
-                label 'docker'
-            }
+        stage('Helm Install') {
             steps {
                 script {
-                    dockerImage = docker.build("${registry}:${BUILD_NUMBER}")
+                    def releaseExists = sh(script: "helm list -n default | grep spcjenkins", returnStatus: true) == 0
 
-                }
-            }
-        }
+                    if (!releaseExists) {
+                        echo "Installing Helm release...."
+                        sh """ 
+                            helm install spcjenkins ./k8s/spc --namespace default"""
+                    }
 
-        stage('Push to Docker Hub') {
-            agent {
-                label 'docker'
-            }
-            steps {
-                script {
-                    withCredentials([string(credentialsId: registryCredential, variable: 'DOCKER_PAT')]) {
-                        sh """
-                        echo $DOCKER_PAT | docker login --username bhavishtumalapenta --password-stdin
-                        """
-                        dockerImage.push()
+                    else {
+                        echo "Helm release already exists."
                     }
                 }
             }
         }
 
-        stage('Clean Up') {
-            agent {
-                label 'docker'
-            }
+        stage('Helm Upgrade') {
             steps {
-                script {
-                    sh "docker rmi ${registry}:${BUILD_NUMBER}"
-                }
+                
+                echo "Upgrading Helm release..."
+                sh """
+                    helm upgrade spcjenkins ./k8s/spc  \
+                    --namespace default \
+                    --set image=bhavishtumalapenta/spring-petclinic-jenkins:345
+                """
             }
-        }
-    }
-
-    post {
-        success {
-            echo 'Pipeline for Infrastructure creation $ Docker iamge Build and Push completed successfully.'
-        }
-
-        failure {
-            echo 'Pipeline for Infrastructure creation or Docker iamge Build and Push failed.'
         }
     }
 
