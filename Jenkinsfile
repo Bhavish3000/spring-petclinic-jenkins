@@ -5,39 +5,46 @@ pipeline {
         cron('0 18 * * 1-5')
     }
 
-    environment {
-        registry = 'bhavishtumalapenta/spring-petclinic-jenkins'
-        registryCredential = 'dockerhub'
-        dockerImage = ''
+    parameters {
+        string(name: 'giturl', defaultValue: 'https://github.com/Bhavish3000/spring-petclinic.git', description: 'Git repo URL')
+        string(name: 'gitbranch', defaultValue: 'deploy', description: 'Git repo branch')
+        string(name: 'gitcredentials', defaultValue: 'GithubCredentials', description: 'GitHub login Credentials')
+        string(name: 'InfaagentLabel', defaultValue: 'terraform', description: 'Lebel for the Infra agent')
+        string(name: 'Terraformshellscript', defaultValue: './Terraform.sh', description: 'Terraforms configuration files execution Shell script')
+        string(name: 'registry', defaultValue: 'bhavishtumalapenta/spring-petclinic-jenkins', description: 'Docker registry')
+        string(name: 'registryCredential', defaultValue: 'dockerhub', description: 'Docker Hub credentials ID')
+        string(name: 'DockerhubUsername', defaultValue: 'bhavishtumalapenta', description: 'User name for Dockerhub')
+        string(name: 'DOckeragentLabel', defaultValue: 'docker', description: 'Lebel for the Docker agent')
+
     }
 
     stages {
         stage('Checkout SCM') {
             steps {
-                git url: 'https://github.com/Bhavish3000/spring-petclinic.git',
-                    branch: 'deploy',
-                    credentialsId: 'GithubCredentials'
+                git url: params.giturl,
+                    branch: params.gitbranch,
+                    credentialsId: params.gitcredentials
             }
         }
 
         stage('Infrastructure') {
             agent {
-                label 'terraform'
+                label params.InfaagentLabel
             }
             steps {
-                sh 'chmod +x ./Terraform.sh'
+                sh 'chmod +x ${params.Terraformshellscript}'
 
-                sh './Terraform.sh'
+                sh '${params.Terraformshellscript}'
             }
         }
 
         stage('Build Docker Image') {
             agent {
-                label 'docker'
+                label params.DOckeragentLabel
             }
             steps {
                 script {
-                    dockerImage = docker.build("${registry}:${BUILD_NUMBER}")
+                    dockerImage = docker.build("${params.registry}:${BUILD_NUMBER}")
 
                 }
             }
@@ -45,13 +52,13 @@ pipeline {
 
         stage('Push to Docker Hub') {
             agent {
-                label 'docker'
+                label params.DOckeragentLabel
             }
             steps {
                 script {
-                    withCredentials([string(credentialsId: registryCredential, variable: 'DOCKER_PAT')]) {
+                    withCredentials([string(credentialsId: params.registryCredential, variable: 'DOCKER_PAT')]) {
                         sh """
-                        echo $DOCKER_PAT | docker login --username bhavishtumalapenta --password-stdin
+                        echo $DOCKER_PAT | docker login --username ${params.DockerhubUsername} --password-stdin
                         """
                         dockerImage.push()
                     }
@@ -61,11 +68,11 @@ pipeline {
 
         stage('Clean Up') {
             agent {
-                label 'docker'
+                label params.DOckeragentLabel
             }
             steps {
                 script {
-                    sh "docker rmi ${registry}:${BUILD_NUMBER}"
+                    sh "docker rmi ${params.registry}:${BUILD_NUMBER}"
                 }
             }
         }
