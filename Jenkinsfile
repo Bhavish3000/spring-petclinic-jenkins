@@ -20,7 +20,9 @@ pipeline {
         string(name: 'artifact_path', defaultValue: '**/target/*.jar', description: 'Artifact path of the pipeline')
         string(name: 'unittest_path', defaultValue: '**/surefire-reports/*.xml', description: 'path for the Unit teats')
         string(name: 'sonar_organization', defaultValue: 'gameoflifebhavish', description: 'Sonar cloud organization')
-
+        booleanParam(name: 'traceability', defaultValue: true)
+        booleanParam(name: 'fingerprint', defaultValue: true)
+        booleanParam(name: 'onlyIfSuccessful', defaultValue: true)
 
 
     }
@@ -44,7 +46,7 @@ pipeline {
                 withMaven(
                     maven: 'maven3.9.9',
                     jdk: 'java17',
-                    traceability: true
+                    traceability: params.traceability
                 ) {
                     sh 'mvn clean install'
                     junit testResults: params.unittest_path
@@ -55,8 +57,8 @@ pipeline {
         stage('Archive Artifact') {
             steps {
                 archiveArtifacts artifacts: params.artifact_path,
-                    fingerprint: true,
-                    onlyIfSuccessful: true
+                    fingerprint: params.fingerprint,
+                    onlyIfSuccessful: params.onlyIfSuccessful
             }
         }
 
