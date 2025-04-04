@@ -7,34 +7,44 @@ pipeline {
         cron('0 23 * * 1-5')
     }
 
-    environment {
-        KUBECONFIG = credentials('kubernetes-config')
+    parameters {
+        string(name: 'giturl', defaultValue: 'https://github.com/Bhavish3000/spring-petclinic.git', description: 'Git repo URL')
+        string(name: 'gitbranch', defaultValue: 'deploy', description: 'Git repo branch')
+        string(name: 'gitcredentials', defaultValue: 'GithubCredentials', description: 'GitHub login Credentials')
+        string(name: 'kubernetesConfigCredential', defaultValue: 'kubernetes-config', description: 'Kubernetes config credentials ID')
+        string(name: 'helmReleaseName', defaultValue: 'spcjenkins', description: 'Helm release name')
+        string(name: 'helmNamespace', defaultValue: 'default', description: 'Helm namespace')
+        string(name: 'helmChartPath', defaultValue: './k8s/spc', description: 'Helm chart path')
+        string(name: 'dockerImage', defaultValue: 'bhavishtumalapenta/spring-petclinic-jenkins:345', description: 'Docker image for Helm upgrade')
+        string(name: 'agentlabel', defaultValue: 'Kubernetes', description: 'Value of agents label')
     }
 
     stages {
 
         stage('Checkout SCM') {
             steps {
-                git url: 'https://github.com/Bhavish3000/spring-petclinic.git',
-                    branch: 'deploy',
-                    credentialsId: 'GithubCredentials'
+                git url: params.giturl,
+                    branch: params.gitbranch,
+                    credentialsId: params.gitcredentials
             }
         }
-        
 
         stage('Helm Install') {
             steps {
                 script {
-                    def releaseExists = sh(script: "helm list -n default | grep spcjenkins", returnStatus: true) == 0
+                    withCredentials([file(credentialsId: params.kubernetesConfigCredential, variable: 'KUBECONFIG')]) {
+                        def releaseExists = sh(script: "helm list -n ${params.helmNamespace} | grep ${params.helmReleaseName}", returnStatus: true) == 0
 
-                    if (!releaseExists) {
-                        echo "Installing Helm release...."
-                        sh """ 
-                            helm install spcjenkins ./k8s/spc --namespace default"""
-                    }
+                        if (!releaseExists) {
+                            echo "Installing Helm release...."
+                            sh """ 
+                                helm install ${params.helmReleaseName} ${params.helmChartPath} --namespace ${params.helmNamespace}
+                            """
+                        }
 
-                    else {
-                        echo "Helm release already exists."
+                        else {
+                            echo "Helm release already exists."
+                        }
                     }
                 }
             }
@@ -42,15 +52,25 @@ pipeline {
 
         stage('Helm Upgrade') {
             steps {
-                
-                echo "Upgrading Helm release..."
-                sh """
-                    helm upgrade spcjenkins ./k8s/spc  \
-                    --namespace default \
-                    --set image=bhavishtumalapenta/spring-petclinic-jenkins:345
-                """
+                withCredentials([file(credentialsId: params.kubernetesConfigCredential, variable: 'KUBECONFIG')]) {
+                    echo "Upgrading Helm release..."
+                    sh """
+                        helm upgrade ${params.helmReleaseName} ${params.helmChartPath}  \
+                        --namespace ${params.helmNamespace} \
+                        --set image=${params.dockerImage}
+                    """
+                }
             }
         }
     }
 
+    post {
+        success {
+            echo 'Pipeline completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed.'
+        }
+    }
 }
